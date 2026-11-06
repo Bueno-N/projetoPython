@@ -67,7 +67,7 @@ class Aluno(models.Model):
 
       matricula        texto curto, OBRIGATORIO, UNICO
                        -> models.CharField("matricula", max_length=20, unique=True)
-
+    
       nome             texto, OBRIGATORIO
                        -> models.CharField("nome", max_length=120)
 
@@ -97,7 +97,13 @@ class Aluno(models.Model):
     em material/02-models-e-migrations.md.
     """
 
-    # >>> ESCREVA OS CAMPOS AQUI <<<
+    matricula = models.CharField("matricula", max_length=20, unique=True)
+    nome = models.CharField("nome", max_length=120)
+    email = models.EmailField("e-mail", blank=True)
+    data_nascimento = models.DateField(
+        "data de nascimento", null=True, blank=True
+    )
+    ativo = models.BooleanField("ativo", default=True)
 
     class Meta:
         # Mantemos o nome de tabela da Entrega 1. Sem esta linha, o
@@ -111,7 +117,7 @@ class Aluno(models.Model):
         # modelo -- equivale a por ORDER BY nome em todo SELECT.
         # (Esta linha vem comentada porque o Django recusa subir com
         #  ordering apontando para um campo que ainda nao existe.)
-        # ordering = ["nome"]
+        ordering = ["nome"]
 
     def __str__(self):
         """
@@ -123,7 +129,7 @@ class Aluno(models.Model):
         implementar, voce vai ver "Aluno object (1)" na tela de
         inscricao e nao vai saber quem e quem.
         """
-        return super().__str__()
+        return f"{self.matricula} - {self.nome}"
 
 
 class Disciplina(models.Model):
@@ -160,12 +166,23 @@ class Disciplina(models.Model):
 
     # >>> ESCREVA OS CAMPOS AQUI <<<
 
+    codigo = models.CharField("codigo", max_length=20, unique=True)
+    nome = models.CharField("nome", max_length=120)
+    carga_horaria = models.IntegerField(
+        "carga horaria", validators=[MinValueValidator(1)])
+    periodo = models.IntegerField(
+        "periodo", null=True, blank=True, validators=[MinValueValidator(1)]
+    )
+
+
+
+
     class Meta:
         db_table = "disciplina"
         verbose_name = "disciplina"
         verbose_name_plural = "disciplinas"
         # DESCOMENTE depois de declarar os campos (TODO 2).
-        # ordering = ["periodo", "nome"]
+        ordering = ["periodo", "nome"]
 
     def __str__(self):
         """TODO 2b -- sugestao: f"{self.codigo} - {self.nome}" """
@@ -238,8 +255,35 @@ class Inscricao(models.Model):
     (ele tem uma nota por disciplina) nem da disciplina (ela tem uma
     nota por aluno). A nota e um atributo do ENCONTRO entre os dois --
     e o encontro e justamente esta tabela.
+
+
+
+
+
     """
 
+    aluno = models.ForeignKey(
+        Aluno,
+        on_delete=models.PROTECT,
+        related_name="inscricoes",
+        verbose_name="aluno",
+    )
+    disciplina = models.ForeignKey(
+        Disciplina,
+        on_delete=models.PROTECT,
+        related_name="inscricoes",
+        verbose_name="disciplina",
+    )   
+    nota1 = models.DecimalField(
+        "1a nota", max_digits=4, decimal_places=2,
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+    )
+    nota2 = models.DecimalField(
+        "2a nota", max_digits=4, decimal_places=2,
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+    )
     # >>> ESCREVA OS CAMPOS AQUI <<<
     #
     # Para as notas, DecimalField e melhor que FloatField:
@@ -261,13 +305,19 @@ class Inscricao(models.Model):
         verbose_name = "inscricao"
         verbose_name_plural = "inscricoes"
         # DESCOMENTE depois de declarar as chaves estrangeiras (TODO 3).
-        # ordering = ["aluno", "disciplina"]
+        ordering = ["aluno", "disciplina"]
+        uniqueConstraints = [
+            models.UniqueConstraint(
+                fields=["aluno", "disciplina"],
+                name="inscricao_unica_por_aluno_disciplina",
+            )
+        ]
         # >>> DECLARE A UniqueConstraint AQUI <<<
 
     def __str__(self):
         """TODO 3b -- sugestao: f"{self.aluno} em {self.disciplina}" """
-        return super().__str__()
-
+        return f"{self.aluno} em {self.disciplina}"
+        
     @property
     def media(self):
         """
@@ -285,4 +335,6 @@ class Inscricao(models.Model):
                 return None
             return (self.nota1 + self.nota2) / 2
         """
+        if self.nota1 is not None and self.nota2 is not None:
+            return (self.nota1 + self.nota2) / 2
         return None
